@@ -15,6 +15,23 @@ const errorMsg = ref(null)
 const hfToken = ref('')
 
 const OCR_SPACE_URL = 'https://api.ocr.space/parse/image'
+const MAX_SIZE = 1500
+
+function resizeImage(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, MAX_SIZE / Math.max(img.width, img.height))
+      if (scale === 1) return resolve(dataUrl)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', 0.9))
+    }
+    img.src = dataUrl
+  })
+}
 
 function handleFile(file) {
   if (!file || !file.type.startsWith('image/')) return
@@ -48,13 +65,15 @@ function clearImage() {
 async function runOCR() {
   if (!imageData.value) return
   processing.value = true
-  progressStatus.value = 'Sending to OCR.space...'
+  progressStatus.value = 'Preparing image...'
   ocrResult.value = null
   errorMsg.value = null
 
   try {
+    const resized = await resizeImage(imageData.value)
+    progressStatus.value = 'Sending to OCR.space...'
     const body = new FormData()
-    body.append('base64image', imageData.value)
+    body.append('base64image', resized)
     body.append('language', 'eng')
     body.append('ocrengine', '2')
     body.append('scale', 'true')
